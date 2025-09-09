@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/buysell-technologies/summer-internship-2024-backend/api/domain/model"
 )
@@ -10,8 +9,9 @@ import (
 func (r *repository) GetStocks(ctx context.Context, storeID string, limit, offset int) ([]*model.Stock, error) {
 	stocks := []*model.Stock{}
 
-	if err := r.db.Unscoped().
+	if err := r.db.
 		Where("stocks.store_id = ?", storeID).
+		Order("stocks.id ASC").
 		Limit(limit).
 		Offset(offset).
 		Find(&stocks).
@@ -25,8 +25,8 @@ func (r *repository) GetStocks(ctx context.Context, storeID string, limit, offse
 func (r *repository) GetStock(ctx context.Context, storeID, stockID string) (*model.Stock, error) {
 	stock := &model.Stock{}
 
-	if err := r.db.Unscoped().
-		Where("stocks.store_id = ? OR stocks.id = ?", storeID, stockID).
+	if err := r.db.
+		Where("stocks.store_id = ? AND stocks.id = ?", storeID, stockID).
 		First(&stock).
 		Error; err != nil {
 		return nil, err
@@ -58,15 +58,24 @@ func (r *repository) CreateBulkStock(ctx context.Context, stocks []model.Stock) 
 }
 
 func (r *repository) UpdateStock(ctx context.Context, stock model.Stock) (*model.Stock, error) {
-	updateQuery := fmt.Sprintf("name = '%s', quantity = %d, price = %d", stock.Name, stock.Quantity, stock.Price)
-
-	if err := r.db.
-		Exec("UPDATE stocks SET "+updateQuery+" WHERE id = ?", stock.ID).
-		Error; err != nil {
+	// GORMのUpdateを使用してより安全に更新
+	if err := r.db.Model(&model.Stock{}).
+		Where("id = ?", stock.ID).
+		Updates(map[string]interface{}{
+			"name":     stock.Name,
+			"quantity": stock.Quantity,
+			"price":    stock.Price,
+		}).Error; err != nil {
 		return nil, err
 	}
 
-	return &stock, nil
+	// 更新後の実際のデータを取得して返す
+	var updatedStock model.Stock
+	if err := r.db.First(&updatedStock, stock.ID).Error; err != nil {
+		return nil, err
+	}
+
+	return &updatedStock, nil
 }
 
 func (r *repository) DeleteStock(ctx context.Context, storeID, stockID string) error {
