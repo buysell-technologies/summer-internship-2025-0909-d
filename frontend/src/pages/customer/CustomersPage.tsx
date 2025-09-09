@@ -31,15 +31,25 @@ const CustomersPage = () => {
   const [page, setPage] = useState(0);
 
   const [rowsPerPage, setRowsPerPage] = useState<number>(() => {
-    const stored = localStorage.getItem(CUSTOMER_PAGE_SETTINGS_STORAGE_KEY)!;
-    const parsed = JSON.parse(stored) as CustomerPageSettings;
-    if (
-      typeof parsed.rowsPerPage === 'number' &&
-      VALID_PAGE_SIZES.includes(parsed.rowsPerPage as ValidPageSize)
-    ) {
-      return parsed.rowsPerPage;
+    try {
+      const stored = localStorage.getItem(CUSTOMER_PAGE_SETTINGS_STORAGE_KEY);
+
+      if (!stored) {
+        return DEFAULT_SETTINGS.rowsPerPage;
+      }
+
+      const parsed = JSON.parse(stored) as CustomerPageSettings;
+
+      if (
+        typeof parsed.rowsPerPage === 'number' &&
+        VALID_PAGE_SIZES.includes(parsed.rowsPerPage as ValidPageSize)
+      ) {
+        return parsed.rowsPerPage;
+      }
+      return DEFAULT_SETTINGS.rowsPerPage;
+    } catch {
+      return DEFAULT_SETTINGS.rowsPerPage;
     }
-    return DEFAULT_SETTINGS.rowsPerPage;
   });
 
   const { data, isLoading, error, refetch } = useGetCustomers({
