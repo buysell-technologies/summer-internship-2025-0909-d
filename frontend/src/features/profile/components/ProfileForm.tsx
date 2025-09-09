@@ -54,7 +54,7 @@ const ProfileForm = ({ user, refetch }: ProfileFormProps) => {
             email: value.email,
             store_id: user?.store_id || '',
             employee_number: user?.employee_number || '',
-            userID: user?.id || '',
+            // userID: user?.id || '',
           },
         },
         {

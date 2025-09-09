@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { convertCSVFromArray } from '../../utils/convertCSVFromArray';
+import dayjs from 'dayjs';
+import type { ModelStock } from '../../api/generated/model';
 import { useGetStocks } from '../../api/generated/api';
 import type { ModelStock } from '../../api/generated/model';
 import { apiClient } from '../../api/apiClient';
@@ -80,6 +83,51 @@ const StocksPage = () => {
     limit: rowsPerPage,
     offset: page * rowsPerPage,
   });
+
+  const [csvLoading, setCsvLoading] = useState(false);
+  const [csvError, setCsvError] = useState<string | null>(null);
+
+  // CSV用データ整形
+  const formatStocksForCSV = (stocks: ModelStock[]) => {
+    return stocks.map((s) => ({
+      ID: s.id ?? '',
+      商品名: s.name ?? '',
+      価格: s.price != null ? `${s.price.toLocaleString()}円` : '',
+      在庫数: s.quantity ?? '',
+      作成日時: s.created_at
+        ? dayjs(s.created_at).format('YYYY/MM/DD HH:mm')
+        : '',
+      更新日時: s.updated_at
+        ? dayjs(s.updated_at).format('YYYY/MM/DD HH:mm')
+        : '',
+    }));
+  };
+
+  // CSVダウンロード処理
+  const handleDownloadCSV = async () => {
+    if (!data || data.length === 0) return;
+    setCsvLoading(true);
+    setCsvError(null);
+    try {
+      const csvData = formatStocksForCSV(data);
+      const csv = convertCSVFromArray(csvData);
+      const now = dayjs();
+      const filename = `stocks_${now.format('YYYYMMDD_HHmmss')}.csv`;
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setCsvError('CSV出力中にエラーが発生しました');
+    } finally {
+      setCsvLoading(false);
+    }
+  };
 
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
@@ -288,7 +336,9 @@ const StocksPage = () => {
           flexShrink: 0,
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'stretch', sm: 'center' },
+          gap: 2,
         }}
       >
         <Typography
@@ -299,27 +349,42 @@ const StocksPage = () => {
             fontWeight: 600,
             color: '#1a1a1a',
             margin: 0,
+            flex: 1,
           }}
         >
           在庫管理
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setShowCreateForm(true)}
-          sx={{
-            px: 3,
-            py: 1.5,
-          }}
-        >
-          新規登録
-        </Button>
-      </Box>
-      <Box
+
+      // 1つ目のボタン：新規登録用
+      <Button
+        variant="contained"
+        startIcon={<AddIcon />}
+        onClick={() => setShowCreateForm(true)}
         sx={{
-          p: 3,
+          px: 3,
+          py: 1.5,
         }}
       >
+        新規登録
+      </Button>
+
+      // 2つ目のボタン：CSVダウンロード用
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={handleDownloadCSV}
+        disabled={csvLoading || !data || data.length === 0}
+        sx={{ minWidth: 140, fontWeight: 600 }}
+      >
+        {csvLoading ? 'ダウンロード中...' : 'CSVダウンロード'}
+      </Button>
+      </Box>
+      <Box sx={{ p: 3 }}>
+        {csvError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {csvError}
+          </Alert>
+        )}
         <StockTable
           stocks={data || []}
           page={page}
